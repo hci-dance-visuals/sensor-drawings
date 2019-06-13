@@ -20,6 +20,27 @@ from datasetTools import loadDataset
 imageH = imageSize[0]
 imageW = imageSize[1]
 
+def layer_images(frameBuffer, exp):
+    imageBuffer = frameBuffer
+    prevImg = 0
+    combined_heatmaps = 0
+    #use first frame as seed
+    firstFrame = 0
+    img = imageBuffer[firstFrame]
+    if img is not None:
+        prevImg = np.copy(img) #copy seed and fill with black pixels
+        prevImg[prevImg > 0] = 0 #np.zeros wasn't happening
+        combined_heatmaps = np.copy(prevImg)
+    for file in imageBuffer:
+        img = file
+        #print(len(prevImg.shape))
+        if img is not None:
+            #layer the following frame
+            combined_heatmaps = cv2.addWeighted(prevImg, 1, img, exp, 0)
+            prevImg = combined_heatmaps #copy the result and repeat
+    #imgString = cv2.imencode(".png",combined_heatmaps)
+    return combined_heatmaps
+
 def create_gif(inputPath, outputPath, delay, finalDelay, loop):
     # grab all image paths in the input directory
     imagePaths = sorted(list(paths.list_images(inputPath)))

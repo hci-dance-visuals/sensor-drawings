@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-DISCLAIMER:
-This code has been written in the optic
-of my 'quick-n-dirty' Deep Learning series
-on Medium (@juliendespois) to show the
-concepts. Please do not judge me by the
-quality of the code.
-¯\_(ツ)_/¯
-"""
+    DISCLAIMER:
+    This code has been written in the optic
+    of my 'quick-n-dirty' Deep Learning series
+    on Medium (@juliendespois) to show the
+    concepts. Please do not judge me by the
+    quality of the code.
+    ¯\_(ツ)_/¯
+    """
 from tornado import websocket, web, ioloop
 import thread
 
@@ -16,14 +16,15 @@ import time, math
 import cv2
 
 from config import latent_dim, modelsPath, imageSize
-from keras.optimizers import RMSprop
 from model import getModels
-from visuals import visualizeDataset, visualizeReconstructedImages, computeTSNEProjectionOfLatentSpace, computeTSNEProjectionOfPixelSpace, visualizeInterpolation, visualizeArithmetics, getInterpolatedFrames, scrub_images
+from visuals import visualizeDataset, visualizeReconstructedImages, computeTSNEProjectionOfLatentSpace,computeTSNEProjectionOfPixelSpace, visualizeInterpolation, visualizeArithmetics, getInterpolatedFrames, scrub_images,layer_images
 from datasetTools import loadDataset, loadDatasetLabelled
 import numpy as np
 import tensorflow as tf
+from keras.optimizers import RMSprop
 from random import randint
 
+from numpy_ringbuffer import RingBuffer
 from pyImageStreamer import PyImageStreamer
 
 # Handy parameters
@@ -37,7 +38,12 @@ runID = "{} - Autoencoder - MNIST".format(1./time.time())
 osc_server = None
 osc_listening_port = 12000
 scrub_position = 0
+likeliest = 0
+window_size = 15
+scrub_input = RingBuffer(capacity=window_size, dtype=int)
 delay = 50
+smudge_enabled = True
+smudge_amt = 1.0
 
 cl = []
 
@@ -125,32 +131,53 @@ def testModel(stream_output=False):
     print("Loading dataset...")
     X_train, X_test, Y_train = loadDatasetLabelled()
     name_list = np.unique(Y_train)
-    print(name_list)
+    # print(name_list)
     # Visualization functions
     #visualizeReconstructedImages(X_train[:180],X_test[:20], autoencoder)
     #     computeTSNEProjectionOfPixelSpace(X_test[:1000], display=True)
     #     computeTSNEProjectionOfLatentSpace(X_train[:1000], encoder, display=True)
+    old_likeliest = likeliest
     scrub = 0
-    id = 5
-    seed = (id*20) + 0
+    id = 9
+    seed = (id*20) + likeliest
     scrub_destination = seed + 1
     name = Y_train[seed]
     ri = getInterpolatedFrames(X_train[seed], X_train[scrub_destination], encoder, decoder, save=False, nbSteps=50)
-    while 1 :
-        osc_server.recv(10)
+    while likeliest == old_likeliest:
+        osc_server.recv(50)
+        if (smudge_enabled):
+            if(scrub_input.shape[0] > 0):
+                frame_buffer = [ri[sc] for sc in scrub_input]
+                img_out = layer_images(frame_buffer, 1.0)
+            else:
+                continue
+        else:
+            img_out = ri[int(math.floor(scrub_position*49))]
         if (stream_output):
-            png_bytes = pyImageStreamer.get_jpeg_image_bytes(ri[int(math.floor(scrub_position*49))])
+            png_bytes = pyImageStreamer.get_jpeg_image_bytes(img_out)
             if len(cl)>0: cl[-1].write_message(png_bytes, binary=True)
         else:
-            cv2.imshow('Moving_Digits',ri[int(math.floor(scrub_position*49))])
-            cv2.waitKey(delay)
+            cv2.imshow('Moving_Digits',img_out)
+            cv2.waitKey(2)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 return
+    testModel(stream_output)
+            # cv2.imshow('Moving_Digits',ri[int(math.floor(scrub_position*49))])
+            # cv2.waitKey(delay)
+            # if cv2.waitKey(1) & 0xFF == ord('q'):
+            #     return
 #    0 while 1 :visualizeArithmetics(X_test[randint(0,X_test.shape[0])], X_test[randint(0,X_test.shape[0])], X_test[randint(0,X_test.shape[0])], encoder, decoder)
 
 def update_scrub(path, args):
     global scrub_position
+    global scrub_input
     scrub_position = args[0]
+    scrub_input.appendleft(int(math.floor(scrub_position*49)))
+
+def update_likeliest(path, args):
+    global likeliest
+    likeliest = args[0]
+    print("likeliest: %s" % likeliest)
 
 def fallback(path, args, types, src):
     print "got unknown message '%s' from '%s'" % (path, src.get_url())
@@ -169,11 +196,12 @@ def init_osc_server():
         print str(err)
         sys.exit()
     server.add_method("/modi/scrub", 'ffff', update_scrub)
+    server.add_method("/modi/likeliest", 'i', update_likeliest)
     server.add_method(None, None, fallback)
     return server
 #    thread.start_new_thread(osc_input_handler, (server,))
 
-pyImageStreamer = PyImageStreamer(80, 1, 8882, 1.0)
+pyImageStreamer = PyImageStreamer(50, 1, 8882, 0.5)
 class SocketHandler(websocket.WebSocketHandler):
     def check_origin(self, origin):
         return True
@@ -212,8 +240,6 @@ if __name__ == "__main__":
         trainModel(startEpoch=0)
     elif arg == "test":
         osc_server = init_osc_server()
-        print("Sending bytes to: http://localhost:" + str(pyImageStreamer.port) + "/")
-        app.listen(pyImageStreamer.port)
         testModel(stream_output=False)
         ioloop.IOLoop.current().start()
     elif arg == "stream":
