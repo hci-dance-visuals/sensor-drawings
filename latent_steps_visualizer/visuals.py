@@ -250,7 +250,8 @@ def getInterpolatedFrames(start, end, encoder, decoder, save=False, nbSteps=5, p
     # Compute latent space projection
     latentX = encoder.predict(X)
     latentStart, latentEnd = latentX
-
+    print ("latent start: ", latentStart.shape[0])
+    print ("latent  end: ", latentEnd.shape[0])
     # Get original image for comparison
     startImage, endImage = X
 
@@ -275,14 +276,15 @@ def getInterpolatedFrames(start, end, encoder, decoder, save=False, nbSteps=5, p
         reconstructedImage = reconstructions[i]*255.
         reconstructedImage = reconstructedImage.reshape([112,112])
         reconstructedImage = cv2.resize(reconstructedImage,(256,502))
+#        cv2.imwrite("Visuals/"+str(i)+'.png', reconstructedImage)
         reconstructedImage = reconstructedImage.astype(np.uint8)
         reconstructedImages.append(reconstructedImage)
     print("Finished interpolating sequence")
     return reconstructedImages
 
-def scrub_images(reconstructedImages, scrub):
-    cv2.imshow('Moving_Digits',reconstructedImages[scrub])
-    cv2.waitKey(50)
+#def scrub_images(reconstructedImages, scrub):
+#    cv2.imshow('Moving_Digits',reconstructedImages[scrub])
+#    cv2.waitKey(50)
 #    if cv2.waitKey(1) & 0xFF == ord('q'):
 #        return
 

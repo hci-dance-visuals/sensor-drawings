@@ -1,1 +1,3 @@
 for f in $(find . -path \*/scaled/*.png); do cp $f sketch_feature_extractor/sketch_dataset/"${f/*/$RANDOM.png}"; done
+
+for f in $(find ./sketch_feature_extractor/data/img/*/*.png); do cp $f sketch_feature_extractor/sketch_dataset_2/"${f/*/$RANDOM.png}"; done

@@ -9,6 +9,7 @@ name_filter = [".ipynb_checkpoints", "unprocessed", "scaled"]
 
 dataset_directory = "sketch_feature_extractor/sketch_dataset/"
 dataset_directory_2 = "sketch_feature_extractor/data/img"
+test_dataset_directory = "../Soma_Draw/img_save/data/"
 
 dancer_ids = {"Einav": 0,
             "Eleonora": 1
@@ -50,17 +51,38 @@ def loadDatasetLabelled():
             file_path = os.path.join(path,file)
             if "scaled" in file_path:
                 id = str(int(ceil(len(X_train)/20)))
-                label = get_name(file_path, 3) + str(int(ceil(len(X_train)/20))) + '-' + str(int(seq_number%20))
+                label = get_name(file_path, 3) + str(int(ceil(len(X_train)/20))) + '-' + "%02d" % int(seq_number%20)
                 img = cv2.imread(file_path)
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
                 X_train.append(img)
                 Y_train.append(label)
                 seq_number = seq_number + 1
+    X_test = []
+    Y_test = []
+    seq_number = 0
+    test_positions = [0]
+    for path, subdirs, files, in os.walk(test_dataset_directory):
+        subdirs.sort()
+        for file in files:
+            file_path = os.path.join(path,file)
+            if "scaled" in file_path:
+                id = str(int(ceil(len(X_test)/20)))
+                label = get_name(file_path, 3) + str(int(ceil(len(X_test)/20))) + '-' + "%02d" % int(seq_number%20)
+                try:
+                    img = cv2.imread(file_path)
+                    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                    X_test.append(img)
+                    Y_test.append(label)
+                    seq_number = seq_number + 1
+                except:
+                    continue
     X_train = np.array(X_train)
-    X_test = X_train[int(round(X_train.shape[0]*0.9)):X_train.shape[0],:,:]
     X_train = X_train.reshape([-1,112,112,1])/255.
-    X_test = X_test.reshape([-1,112,112,1])/255.
     Y_train = np.array(Y_train)
+    X_test = np.array(X_test)
+    Y_test = np.array(Y_test)
+#    X_test = X_train[int(round(X_train.shape[0]*0.9)):X_train.shape[0],:,:]
+    X_test = X_test.reshape([-1,112,112,1])/255.
     return X_train, X_test, Y_train
 
 if __name__ == "__main__":

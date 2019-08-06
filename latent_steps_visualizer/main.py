@@ -17,7 +17,7 @@ import cv2
 
 from config import latent_dim, modelsPath, imageSize
 from model import getModels
-from visuals import visualizeDataset, visualizeReconstructedImages, computeTSNEProjectionOfLatentSpace,computeTSNEProjectionOfPixelSpace, visualizeInterpolation, visualizeArithmetics, getInterpolatedFrames, scrub_images,layer_images
+from visuals import visualizeDataset, visualizeReconstructedImages, computeTSNEProjectionOfLatentSpace,computeTSNEProjectionOfPixelSpace, visualizeInterpolation, visualizeArithmetics, getInterpolatedFrames, layer_images
 from datasetTools import loadDataset, loadDatasetLabelled
 import numpy as np
 import tensorflow as tf
@@ -26,6 +26,9 @@ from random import randint
 
 from numpy_ringbuffer import RingBuffer
 from pyImageStreamer import PyImageStreamer
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+tf.logging.set_verbosity(tf.logging.ERROR)
 
 # Handy parameters
 nbEpoch = 75
@@ -36,15 +39,17 @@ modelName = "autoencoder_modi.h5"
 runID = "{} - Autoencoder - MNIST".format(1./time.time())
 
 osc_server = None
-osc_listening_port = 12000
+osc_listening_port = 12001
+ws_send_port = 8882
 scrub_position = 0
 likeliest = 0
-window_size = 15
+window_size = 25
 scrub_input = RingBuffer(capacity=window_size, dtype=int)
-delay = 50
-smudge_enabled = True
-smudge_amt = 1.0
-
+delay = 0
+smudge_enabled = False
+smudge_amt = 1.2
+id = 6
+gesture_selection = [3,6,7,9]
 cl = []
 
 # Returns the string of remaining training time
@@ -131,20 +136,23 @@ def testModel(stream_output=False):
     print("Loading dataset...")
     X_train, X_test, Y_train = loadDatasetLabelled()
     name_list = np.unique(Y_train)
-    # print(name_list)
+#    print(name_list)
     # Visualization functions
     #visualizeReconstructedImages(X_train[:180],X_test[:20], autoencoder)
     #     computeTSNEProjectionOfPixelSpace(X_test[:1000], display=True)
     #     computeTSNEProjectionOfLatentSpace(X_train[:1000], encoder, display=True)
-    old_likeliest = likeliest
+    lkst = likeliest
     scrub = 0
-    id = 9
-    seed = (id*20) + likeliest
-    scrub_destination = seed + 1
+    seed = (id*20) + gesture_selection[likeliest]
+#    seed = (id*20) + (likeliest*4)
+    scrub_destination = seed + 4
     name = Y_train[seed]
-    ri = getInterpolatedFrames(X_train[seed], X_train[scrub_destination], encoder, decoder, save=False, nbSteps=50)
-    while likeliest == old_likeliest:
-        osc_server.recv(50)
+#    ri = getInterpolatedFrames(X_train[randint(0,X_test.shape[0])],
+#    X_train[randint(0,X_test.shape[0])], encoder, decoder, save=False, nbSteps=10)
+    ri = getInterpolatedFrames(X_train[seed], X_train[scrub_destination], encoder, decoder, save=False, nbSteps=3)
+#    return
+    while likeliest == lkst:
+        osc_server.recv(10)
         if (smudge_enabled):
             if(scrub_input.shape[0] > 0):
                 frame_buffer = [ri[sc] for sc in scrub_input]
@@ -152,7 +160,7 @@ def testModel(stream_output=False):
             else:
                 continue
         else:
-            img_out = ri[int(math.floor(scrub_position*49))]
+            img_out = ri[int(math.floor(scrub_position*2))]
         if (stream_output):
             png_bytes = pyImageStreamer.get_jpeg_image_bytes(img_out)
             if len(cl)>0: cl[-1].write_message(png_bytes, binary=True)
@@ -172,6 +180,7 @@ def update_scrub(path, args):
     global scrub_position
     global scrub_input
     scrub_position = args[0]
+#    scrub_position = args[likeliest]
     scrub_input.appendleft(int(math.floor(scrub_position*49)))
 
 def update_likeliest(path, args):
@@ -201,7 +210,7 @@ def init_osc_server():
     return server
 #    thread.start_new_thread(osc_input_handler, (server,))
 
-pyImageStreamer = PyImageStreamer(50, 1, 8882, 0.5)
+pyImageStreamer = PyImageStreamer(50, 1, ws_send_port, 1.0)
 class SocketHandler(websocket.WebSocketHandler):
     def check_origin(self, origin):
         return True
@@ -230,6 +239,17 @@ def data_handler(imgStreamer):
         png_bytes = imgStreamer.get_jpeg_image_bytes()
         if len(cl)>0: cl[-1].write_message(png_bytes, binary=True)
 
+def export_as_tf():
+    print "exporting"
+    from keras import backend as K
+    from keras.models import load_model
+    autoencoder, encoder, decoder = getModels()
+    autoencoder.load_weights(modelsPath+modelName)
+    saver = tf.train.Saver()
+    sess = K.get_session()
+    save_path = saver.save(sess, "Models/tf_modi")
+
+
 app = web.Application([(r'/', SocketHandler)])
 
 if __name__ == "__main__":
@@ -248,6 +268,8 @@ if __name__ == "__main__":
         app.listen(pyImageStreamer.port)
         thread.start_new_thread(testModel, (True,))
         ioloop.IOLoop.current().start()
+    elif arg == "export":
+        export_as_tf()
     else:
         print "Wrong argument"
 
