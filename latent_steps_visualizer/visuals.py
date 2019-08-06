@@ -282,6 +282,10 @@ def getInterpolatedFrames(start, end, encoder, decoder, save=False, nbSteps=5, p
     print("Finished interpolating sequence")
     return reconstructedImages
 
+    def getInterpolatedFrames(start, end, encoder, decoder, save=False, nbSteps=5, pID = 0, scrub=0):
+        return 0
+
+
 #def scrub_images(reconstructedImages, scrub):
 #    cv2.imshow('Moving_Digits',reconstructedImages[scrub])
 #    cv2.waitKey(50)

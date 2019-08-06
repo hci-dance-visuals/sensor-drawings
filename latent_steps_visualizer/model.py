@@ -24,6 +24,7 @@ imageW = imageSize[1]
 # x is input, z is
 def getModels():
     input_img = Input(shape=(imageH, imageW, 1))
+    print('input', input_img)
     x = Convolution2D(32, (3, 3), padding='same')(input_img)
     x = ELU()(x)
     x = MaxPooling2D((2, 2), padding='same')(x)
@@ -39,7 +40,6 @@ def getModels():
 
     ##### MODEL 1: ENCODER #####
     encoder = Model(input_img, z)
-    print('input', input_img)
     print ('encoder:', encoder)
     print ('z:', z)
 

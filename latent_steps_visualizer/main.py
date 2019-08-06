@@ -18,7 +18,8 @@ import cv2
 from config import latent_dim, modelsPath, imageSize
 from model import getModels
 from visuals import visualizeDataset, visualizeReconstructedImages, computeTSNEProjectionOfLatentSpace,computeTSNEProjectionOfPixelSpace, visualizeInterpolation, visualizeArithmetics, getInterpolatedFrames, layer_images
-from datasetTools import loadDataset, loadDatasetLabelled
+from datasetTools import loadDataset, loadDatasetLabelled, loadDatasetAugmented
+from config import latent_dim, imageSize
 import numpy as np
 import tensorflow as tf
 from keras.optimizers import RMSprop
@@ -31,9 +32,10 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 tf.logging.set_verbosity(tf.logging.ERROR)
 
 # Handy parameters
-nbEpoch = 75
+nbEpoch = 50
 batchSize = 8
-modelName = "autoencoder_modi.h5"
+imSize = imageSize[0]
+modelName = "autoencoder_modi_aug_224.h5"
 
 #Run ID for tensorboard, timestamp is for ordering
 runID = "{} - Autoencoder - MNIST".format(1./time.time())
@@ -43,11 +45,12 @@ osc_listening_port = 12001
 ws_send_port = 8882
 scrub_position = 0
 likeliest = 0
+nsteps = 50
 window_size = 25
 scrub_input = RingBuffer(capacity=window_size, dtype=int)
 delay = 0
-smudge_enabled = False
-smudge_amt = 1.2
+smudge_enabled = True
+smudge_amt = 0.8
 id = 6
 gesture_selection = [3,6,7,9]
 cl = []
@@ -73,14 +76,14 @@ def trainModel(startEpoch=0):
         autoencoder.load_weights(modelsPath+modelName)
 
     print("Loading dataset...")
-    X_train, X_test = loadDataset()
+    X_train, X_test, Y_train = loadDatasetAugmented(imSize)
 
     # Compute number of batches
     nbBatch = int(X_train.shape[0]/batchSize)
 
     # Train the Autoencoder on dataset
-    print "Training Autoencoder for {} epochs with {} batches per epoch and {} samples per batch.".format(nbEpoch,nbBatch,batchSize)
-    print "Run id: {}".format(runID)
+    print ("Training Autoencoder for {} epochs with {} batches per epoch and {} samples per batch.".format(nbEpoch,nbBatch,batchSize))
+    print ("Run id: {}".format(runID))
 
     # Debug utils writer
     writer = tf.summary.FileWriter("/tmp/logs/"+runID)
@@ -110,13 +113,15 @@ def trainModel(startEpoch=0):
             # Validation & Tensorboard Debug
             if batchIndex%20 == 0:
                 validationLoss = autoencoder.evaluate(X_test[:512], X_test[:512], batch_size=256, verbose=0)
-                validationSummary = tf.Summary.Value(tag="Validation Loss", simple_value=float(validationLoss))
-                summary = tf.Summary(value=[trainingSummary,validationSummary])
-                print "Epoch {}/{} - Batch {}/{} - Loss: {:.3f}/{:.3f} - ETA:".format(epoch+1,nbEpoch,batchIndex+1,nbBatch,autoencoderLoss,validationLoss), eta
+                if len(validationLoss) != 0:
+                    validationSummary = tf.Summary.Value(tag="Validation Loss", simple_value=float(validationLoss[0]))
+                    summary = tf.Summary(value=[trainingSummary,validationSummary])
+                    print ("Epoch {}/{} - Batch {}/{} - Loss: {:.3f}/{:.3f} - ETA:".format(epoch+1,nbEpoch,batchIndex+1,nbBatch,autoencoderLoss,validationLoss), eta)
+#                print ("Epoch {}/{} - Batch {}/{} - ETA:".format(epoch+1,nbEpoch,batchIndex+1,nbBatch,autoencoderLoss), eta)
             else:
-                print "Epoch {}/{} - Batch {}/{} - Loss: {:.3f} - ETA:".format(epoch+1,nbEpoch,batchIndex+1,nbBatch,autoencoderLoss), eta
-                summary = tf.Summary(value=[trainingSummary,])
-            writer.add_summary(summary, epoch*nbBatch + batchIndex)
+                print ("Epoch {}/{} - Batch {}/{} - Loss: {:.3f} - ETA:".format(epoch+1,nbEpoch,batchIndex+1,nbBatch,autoencoderLoss), eta)
+#                summary = tf.Summary(value=[trainingSummary,])
+#            writer.add_summary(summary, epoch*nbBatch + batchIndex)
 
         #Save model every epoch
         print("Saving autoencoder...")
@@ -134,8 +139,12 @@ def testModel(stream_output=False):
 
     # Load dataset to test
     print("Loading dataset...")
-    X_train, X_test, Y_train = loadDatasetLabelled()
+    if "aug" in modelName:
+        X_train, X_test, Y_train = loadDatasetAugmented(imSize)
+    else:
+        X_train, X_test, Y_train = loadDatasetLabelled(imSize)
     name_list = np.unique(Y_train)
+    print(X_train.shape)
 #    print(name_list)
     # Visualization functions
     #visualizeReconstructedImages(X_train[:180],X_test[:20], autoencoder)
@@ -147,20 +156,20 @@ def testModel(stream_output=False):
 #    seed = (id*20) + (likeliest*4)
     scrub_destination = seed + 4
     name = Y_train[seed]
-#    ri = getInterpolatedFrames(X_train[randint(0,X_test.shape[0])],
-#    X_train[randint(0,X_test.shape[0])], encoder, decoder, save=False, nbSteps=10)
-    ri = getInterpolatedFrames(X_train[seed], X_train[scrub_destination], encoder, decoder, save=False, nbSteps=3)
+    ri = getInterpolatedFrames(X_train[randint(0,X_train.shape[0])],
+    X_train[randint(0,X_train.shape[0])], encoder, decoder, save=False, nbSteps=nsteps)
+#    ri = getInterpolatedFrames(X_train[seed], X_train[scrub_destination], encoder, decoder, save=False, nbSteps=nsteps)
 #    return
     while likeliest == lkst:
         osc_server.recv(10)
         if (smudge_enabled):
             if(scrub_input.shape[0] > 0):
                 frame_buffer = [ri[sc] for sc in scrub_input]
-                img_out = layer_images(frame_buffer, 1.0)
+                img_out = layer_images(frame_buffer, smudge_amt)
             else:
                 continue
         else:
-            img_out = ri[int(math.floor(scrub_position*2))]
+            img_out = ri[int(math.floor(scrub_position*(nsteps-1)))]
         if (stream_output):
             png_bytes = pyImageStreamer.get_jpeg_image_bytes(img_out)
             if len(cl)>0: cl[-1].write_message(png_bytes, binary=True)
@@ -170,11 +179,6 @@ def testModel(stream_output=False):
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 return
     testModel(stream_output)
-            # cv2.imshow('Moving_Digits',ri[int(math.floor(scrub_position*49))])
-            # cv2.waitKey(delay)
-            # if cv2.waitKey(1) & 0xFF == ord('q'):
-            #     return
-#    0 while 1 :visualizeArithmetics(X_test[randint(0,X_test.shape[0])], X_test[randint(0,X_test.shape[0])], X_test[randint(0,X_test.shape[0])], encoder, decoder)
 
 def update_scrub(path, args):
     global scrub_position
@@ -189,9 +193,9 @@ def update_likeliest(path, args):
     print("likeliest: %s" % likeliest)
 
 def fallback(path, args, types, src):
-    print "got unknown message '%s' from '%s'" % (path, src.get_url())
+    print ("got unknown message '%s' from '%s'") % (path, src.get_url())
     for a, t in zip(args, types):
-        print "argument of type '%s': %s" % (t, a)
+        print ("argument of type '%s': %s") % (t, a)
 
 def init_osc_server():
     print("importing OSC libs")
@@ -255,7 +259,7 @@ app = web.Application([(r'/', SocketHandler)])
 if __name__ == "__main__":
     arg = sys.argv[1] if len(sys.argv) == 2 else None
     if arg is None:
-        print "Need argument"
+        print ("Need argument")
     elif arg == "train":
         trainModel(startEpoch=0)
     elif arg == "test":
@@ -271,7 +275,7 @@ if __name__ == "__main__":
     elif arg == "export":
         export_as_tf()
     else:
-        print "Wrong argument"
+        print ("Wrong argument")
 
 #    for i in range(50):
 #        # seed = randint(0,X_train.shape[0]-1)

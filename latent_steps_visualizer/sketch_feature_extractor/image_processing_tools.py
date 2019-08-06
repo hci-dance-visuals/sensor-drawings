@@ -10,6 +10,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pdf2image import convert_from_path
 
+import imageio
+import imgaug as ia
+from imgaug import augmenters as iaa
+ia.seed(4)
+
 pdf_directory = "data/pdf/"
 img_directory = "data/img/"
 
@@ -18,7 +23,7 @@ def base_name(path):
 
 def new_performer_data(name):
     ##make new directory for performer
-    new_folder_names = ["", "/unprocessed", "/red", "/cyan", "/red/scaled", "/cyan/scaled"]
+    new_folder_names = ["", "/unprocessed", "/red", "/cyan", "/red/scaled", "/cyan/scaled", "/red/augmented", "/cyan/augmented"]
     target_dir = img_directory + name
     for dir_name in new_folder_names:
         try:
@@ -114,3 +119,44 @@ def extract_drawing(img, hsv_img, lower, upper):
     mask = cv2.bitwise_and(mask_color, mask_outline)
     output = cv2.bitwise_and(img,img, mask=mask)
     return output
+
+def get_seqs():
+    seq = []
+    # Geometric distortion effect
+    seq.append(iaa.Sequential([
+        iaa.ElasticTransformation(alpha=60, sigma=7), 
+    ], random_order=True))
+
+    seq.append(iaa.Sequential([
+        iaa.ElasticTransformation(alpha=100, sigma=7),
+    ], random_order=True))
+
+    seq.append(iaa.Sequential([
+        iaa.ElasticTransformation(alpha=60, sigma=4), 
+    ], random_order=True))
+
+    seq.append(iaa.Sequential([
+        iaa.ElasticTransformation(alpha=100, sigma=4),
+    ], random_order=True))
+    return seq
+    
+def generate_augmentation(drawing, seq):
+    # augment them as one batch
+    images_aug = []
+    for j in range(len(seq)):
+        images_aug.append(seq[j].augment_image(drawing))
+    images_aug = np.array(images_aug)
+#     print(np.shape(images_aug))
+    return images_aug    
+    
+def generate_augmentations(drawings, seq):
+    # augment them as one batch
+    images_aug = []
+    for i in range(len(drawings)):
+        images_aug = []
+        for j in range(len(seq)):
+            images_aug.append(seq[j].augment_images(drawings))
+    images_aug = np.array(images_aug)
+    images_aug = images_aug.transpose()
+#     print(np.shape(images_aug))
+    return images_aug
