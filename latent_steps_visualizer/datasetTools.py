@@ -6,7 +6,7 @@ import numpy as np
 import cv2
 from math import ceil, floor
 
-num_augs = 4
+num_augs = 9
 name_filter = [".ipynb_checkpoints", "unprocessed", "scaled"]
 
 dataset_directory = "sketch_feature_extractor/sketch_dataset/"

@@ -35,7 +35,7 @@ tf.logging.set_verbosity(tf.logging.ERROR)
 nbEpoch = 50
 batchSize = 8
 imSize = imageSize[0]
-modelName = "autoencoder_modi_aug_224.h5"
+modelName = "autoencoder_modi_aug.h5"
 
 #Run ID for tensorboard, timestamp is for ordering
 runID = "{} - Autoencoder - MNIST".format(1./time.time())
