@@ -36,7 +36,7 @@ def layer_images(frameBuffer, exp):
         #print(len(prevImg.shape))
         if img is not None:
             #layer the following frame
-            combined_heatmaps = cv2.addWeighted(prevImg, 1, img, exp, 0)
+            combined_heatmaps = cv2.addWeighted(prevImg, exp, img, 1, 0)
             prevImg = combined_heatmaps #copy the result and repeat
     #imgString = cv2.imencode(".png",combined_heatmaps)
     return combined_heatmaps

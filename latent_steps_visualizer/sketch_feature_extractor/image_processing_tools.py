@@ -9,6 +9,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from pdf2image import convert_from_path
+from random import randint
 
 import imageio
 import imgaug as ia
@@ -119,26 +120,6 @@ def extract_drawing(img, hsv_img, lower, upper):
     mask = cv2.bitwise_and(mask_color, mask_outline)
     output = cv2.bitwise_and(img,img, mask=mask)
     return output
-
-def get_seqs():
-    seq = []
-    # Geometric distortion effect
-    seq.append(iaa.Sequential([
-        iaa.ElasticTransformation(alpha=60, sigma=7), 
-    ], random_order=True))
-
-    seq.append(iaa.Sequential([
-        iaa.ElasticTransformation(alpha=100, sigma=7),
-    ], random_order=True))
-
-    seq.append(iaa.Sequential([
-        iaa.ElasticTransformation(alpha=60, sigma=4), 
-    ], random_order=True))
-
-    seq.append(iaa.Sequential([
-        iaa.ElasticTransformation(alpha=100, sigma=4),
-    ], random_order=True))
-    return seq
     
 def generate_augmentation(drawing, seq):
     # augment them as one batch

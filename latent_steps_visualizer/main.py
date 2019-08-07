@@ -46,11 +46,11 @@ ws_send_port = 8882
 scrub_position = 0
 likeliest = 0
 nsteps = 50
-window_size = 25
+window_size = 15
 scrub_input = RingBuffer(capacity=window_size, dtype=int)
 delay = 0
 smudge_enabled = True
-smudge_amt = 0.8
+smudge_amt = 0.5
 id = 6
 gesture_selection = [3,6,7,9]
 cl = []
@@ -118,10 +118,11 @@ def trainModel(startEpoch=0):
                     summary = tf.Summary(value=[trainingSummary,validationSummary])
                     print ("Epoch {}/{} - Batch {}/{} - Loss: {:.3f}/{:.3f} - ETA:".format(epoch+1,nbEpoch,batchIndex+1,nbBatch,autoencoderLoss,validationLoss), eta)
 #                print ("Epoch {}/{} - Batch {}/{} - ETA:".format(epoch+1,nbEpoch,batchIndex+1,nbBatch,autoencoderLoss), eta)
+                    writer.add_summary(summary, epoch*nbBatch + batchIndex)
             else:
                 print ("Epoch {}/{} - Batch {}/{} - Loss: {:.3f} - ETA:".format(epoch+1,nbEpoch,batchIndex+1,nbBatch,autoencoderLoss), eta)
-#                summary = tf.Summary(value=[trainingSummary,])
-#            writer.add_summary(summary, epoch*nbBatch + batchIndex)
+                summary = tf.Summary(value=[trainingSummary,])
+                writer.add_summary(summary, epoch*nbBatch + batchIndex)
 
         #Save model every epoch
         print("Saving autoencoder...")
