@@ -1,6 +1,6 @@
 # sensor-drawings
 
-This project is used to morph between the bodily drawings collectied during the Moving Digits workshops.
+This project is used to morph between the bodily drawings collectied during the dance workshops.
 ![sample](https://user-images.githubusercontent.com/9369774/65178744-51238800-da51-11e9-9fc3-917ba4970709.png)
 
 The model infractructure and code base is adapted from the following project by [Julien Despois](https://github.com/despoisj):
