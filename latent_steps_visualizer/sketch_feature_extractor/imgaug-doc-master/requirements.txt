@@ -4,7 +4,7 @@ scipy==1.1.0
 Pillow==8.2.0
 matplotlib==3.0.0
 scikit-image==0.14.1
-opencv-python==3.4.3.18
+opencv-python==3.4.7.28
 imageio==2.4.1
 Shapely==1.6.4.post2
 numpydoc==0.8.0
